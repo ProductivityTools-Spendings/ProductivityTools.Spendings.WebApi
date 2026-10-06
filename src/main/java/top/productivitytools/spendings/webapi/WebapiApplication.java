@@ -1,4 +1,4 @@
-package top.productivitytools.familyexpenses.webapi;
+package top.productivitytools.spendings.webapi;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;

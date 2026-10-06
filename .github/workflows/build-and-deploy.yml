@@ -11,13 +11,13 @@ jobs:
       fail-fast: false # Pozwala jednemu runnerowi dokończyć wdrożenie nawet jeśli drugi napotka błąd
       matrix:
         include:
-          - target-runner: "familyexpenses-webapi"
+          - target-runner: "spendings-webapi"
             server-port: "8086"
-            db-url: "jdbc:postgresql://10.10.0.2:5432/ptfamilyexpenses"
+            db-url: "jdbc:postgresql://10.10.0.2:5432/ptspendings"
             db-user: "postgres"
           - target-runner: "T460Ubuntu1"
             server-port: "8086"
-            db-url: "jdbc:postgresql://localhost:5432/ptfamilyexpenses"
+            db-url: "jdbc:postgresql://localhost:5432/ptspendings"
             db-user: "postgres"
 
     runs-on: [ self-hosted, "${{ matrix.target-runner }}" ]
@@ -49,18 +49,18 @@ jobs:
     - name: Stop application
       run: |
         echo "Stopping application"
-        sudo systemctl stop familyexpenses-webapi || true
+        sudo systemctl stop spendings-webapi || true
 
-    - name: Copy Jar to /opt/familyexpenses-webapi
+    - name: Copy Jar to /opt/spendings-webapi
       run: |
-        echo "Copying JAR to /opt/familyexpenses-webapi"
+        echo "Copying JAR to /opt/spendings-webapi"
         umask 002
-        JAR=build/libs/familyexpenses-webapi-0.0.1-SNAPSHOT.jar
+        JAR=build/libs/spendings-webapi-0.0.1-SNAPSHOT.jar
         if [ ! -f "$JAR" ]; then
           echo "Jar not found at $JAR"; exit 1
         fi
-        sudo mkdir -p /opt/familyexpenses-webapi
-        sudo cp "$JAR" /opt/familyexpenses-webapi/
+        sudo mkdir -p /opt/spendings-webapi
+        sudo cp "$JAR" /opt/spendings-webapi/
 
     - name: Configure environment variables and systemd service
       env:
@@ -72,29 +72,29 @@ jobs:
         echo "Configuring environment variables and systemd service file..."
         
         # 1. Create secure environment file with runner-specific configuration
-        cat << EOF > /tmp/familyexpenses-webapi.env
+        cat << EOF > /tmp/spendings-webapi.env
         SERVER_PORT=$SERVER_PORT
         DB_URL=$DB_URL
         DB_USERNAME=$DB_USER
         EOF
 
         if [ -n "$DB_PASS" ]; then
-          echo "DB_PASSWORD=$DB_PASS" >> /tmp/familyexpenses-webapi.env
+          echo "DB_PASSWORD=$DB_PASS" >> /tmp/spendings-webapi.env
         fi
 
-        sudo mv /tmp/familyexpenses-webapi.env /opt/familyexpenses-webapi/familyexpenses-webapi.env
-        sudo chmod 600 /opt/familyexpenses-webapi/familyexpenses-webapi.env
+        sudo mv /tmp/spendings-webapi.env /opt/spendings-webapi/spendings-webapi.env
+        sudo chmod 600 /opt/spendings-webapi/spendings-webapi.env
 
         # 2. Configure and install systemd service
         CURRENT_USER=$(whoami)
-        cp deployment/familyexpenses-webapi.service /tmp/familyexpenses-webapi.service
-        sed -i "s/USER_PLACEHOLDER/$CURRENT_USER/g" /tmp/familyexpenses-webapi.service
-        sudo mv /tmp/familyexpenses-webapi.service /etc/systemd/system/familyexpenses-webapi.service
+        cp deployment/spendings-webapi.service /tmp/spendings-webapi.service
+        sed -i "s/USER_PLACEHOLDER/$CURRENT_USER/g" /tmp/spendings-webapi.service
+        sudo mv /tmp/spendings-webapi.service /etc/systemd/system/spendings-webapi.service
         sudo systemctl daemon-reload
 
     - name: Start application
       run: |
         echo "Starting application"
         # enable, not just start: without it the service would not come back after a VM reboot
-        sudo systemctl enable --now familyexpenses-webapi
-        sudo systemctl restart familyexpenses-webapi
+        sudo systemctl enable --now spendings-webapi
+        sudo systemctl restart spendings-webapi

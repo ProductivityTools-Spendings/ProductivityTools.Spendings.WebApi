@@ -1,4 +1,4 @@
-package top.productivitytools.familyexpenses.webapi.controllers;
+package top.productivitytools.spendings.webapi.controllers;
 
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -20,7 +20,7 @@ public class DebugController {
 
     @GetMapping("/appName")
     public String AppName() {
-        return "PTFamilyExpenses";
+        return "PTSpendings";
     }
 
     @GetMapping("/date")

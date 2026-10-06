@@ -1,11 +1,11 @@
 [Unit]
-Description=Family Expenses WebApi Service
+Description=Spendings WebApi Service
 After=syslog.target network.target
 
 [Service]
 User=USER_PLACEHOLDER
-EnvironmentFile=-/opt/familyexpenses-webapi/familyexpenses-webapi.env
-ExecStart=/usr/bin/java -jar /opt/familyexpenses-webapi/familyexpenses-webapi-0.0.1-SNAPSHOT.jar
+EnvironmentFile=-/opt/spendings-webapi/spendings-webapi.env
+ExecStart=/usr/bin/java -jar /opt/spendings-webapi/spendings-webapi-0.0.1-SNAPSHOT.jar
 AmbientCapabilities=CAP_NET_BIND_SERVICE
 CapabilityBoundingSet=CAP_NET_BIND_SERVICE
 SuccessExitStatus=143

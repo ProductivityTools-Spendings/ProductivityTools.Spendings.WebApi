@@ -35,3 +35,21 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### Terraform ###
+**/.terraform/*
+.terraform.d/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+tf_init_stats.pb
