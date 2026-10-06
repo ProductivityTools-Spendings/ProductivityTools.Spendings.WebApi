@@ -33,6 +33,10 @@ dependencies {
 	testAnnotationProcessor 'org.projectlombok:lombok'
 }
 
+tasks.named('bootJar') {
+	archiveBaseName = 'familyexpenses-webapi'
+}
+
 tasks.named('test') {
 	useJUnitPlatform()
 }
