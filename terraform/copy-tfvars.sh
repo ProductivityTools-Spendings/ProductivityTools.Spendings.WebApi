@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-SOURCE_FILE="/usr/local/google/home/pwujczyk/github/Home.Configuration/familyexpenses.webapi.terraform.tfvars"
+SOURCE_FILE="/usr/local/google/home/pwujczyk/github/Home.Configuration/spendings.webapi.terraform.tfvars"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TARGET_FILE="$SCRIPT_DIR/terraform.tfvars"
 

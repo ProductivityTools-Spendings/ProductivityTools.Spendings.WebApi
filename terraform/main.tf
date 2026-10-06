@@ -33,33 +33,33 @@ resource "google_project_service" "monitoring" {
 
 locals {
   # Installs the Ops Agent so journald (and with it the Spring Boot logs of the
-  # familyexpenses-webapi service) is shipped to Cloud Logging.
+  # spendings-webapi service) is shipped to Cloud Logging.
   ops_agent_setup = file("${path.module}/scripts/install-ops-agent.sh")
 }
 
 # Identity for the API VM so the Ops Agent can ship logs and metrics to Cloud Logging / Monitoring.
-resource "google_service_account" "familyexpenses_vm" {
-  account_id   = "familyexpenses-vm"
-  display_name = "FamilyExpenses API VM (Ops Agent)"
+resource "google_service_account" "spendings_vm" {
+  account_id   = "spendings-vm"
+  display_name = "Spendings API VM (Ops Agent)"
 }
 
-resource "google_project_iam_member" "familyexpenses_vm_log_writer" {
+resource "google_project_iam_member" "spendings_vm_log_writer" {
   project = var.project_id
   role    = "roles/logging.logWriter"
-  member  = "serviceAccount:${google_service_account.familyexpenses_vm.email}"
+  member  = "serviceAccount:${google_service_account.spendings_vm.email}"
 }
 
-resource "google_project_iam_member" "familyexpenses_vm_metric_writer" {
+resource "google_project_iam_member" "spendings_vm_metric_writer" {
   project = var.project_id
   role    = "roles/monitoring.metricWriter"
-  member  = "serviceAccount:${google_service_account.familyexpenses_vm.email}"
+  member  = "serviceAccount:${google_service_account.spendings_vm.email}"
 }
 
 # 1. Main VPC (Custom Subnet Mode)
 resource "google_compute_network" "vpc_network" {
   name                    = var.network_name
   auto_create_subnetworks = false
-  description             = "VPC network for FamilyExpenses environment"
+  description             = "VPC network for Spendings environment"
 }
 
 # 2. Subnetwork in Warsaw region (europe-central2)
@@ -72,23 +72,23 @@ resource "google_compute_subnetwork" "subnet" {
   description              = "Subnetwork located in Warsaw region (europe-central2)"
 }
 
-# 3. Network Firewall Policy: familyexpenses-basic-access
-resource "google_compute_network_firewall_policy" "familyexpenses_basic_access" {
-  name        = "familyexpenses-basic-access"
-  description = "Network firewall policy for FamilyExpenses environment"
+# 3. Network Firewall Policy: spendings-basic-access
+resource "google_compute_network_firewall_policy" "spendings_basic_access" {
+  name        = "spendings-basic-access"
+  description = "Network firewall policy for Spendings environment"
 }
 
 # Associate the Firewall Policy with the VPC Network
-resource "google_compute_network_firewall_policy_association" "familyexpenses_policy_assoc" {
-  name              = "familyexpenses-basic-access-assoc"
+resource "google_compute_network_firewall_policy_association" "spendings_policy_assoc" {
+  name              = "spendings-basic-access-assoc"
   attachment_target = google_compute_network.vpc_network.id
-  firewall_policy   = google_compute_network_firewall_policy.familyexpenses_basic_access.name
+  firewall_policy   = google_compute_network_firewall_policy.spendings_basic_access.name
 }
 
-# Rule within the Firewall Policy allowing public HTTP traffic to FamilyExpenses WebApi (port 8086)
+# Rule within the Firewall Policy allowing public HTTP traffic to Spendings WebApi (port 8086)
 resource "google_compute_network_firewall_policy_rule" "allow_http" {
-  firewall_policy = google_compute_network_firewall_policy.familyexpenses_basic_access.name
-  description     = "Allows incoming HTTP traffic on port 8086 (FamilyExpenses WebApi)"
+  firewall_policy = google_compute_network_firewall_policy.spendings_basic_access.name
+  description     = "Allows incoming HTTP traffic on port 8086 (Spendings WebApi)"
   priority        = 1000
   direction       = "INGRESS"
   action          = "allow"
@@ -105,7 +105,7 @@ resource "google_compute_network_firewall_policy_rule" "allow_http" {
 
 # Rule within the Firewall Policy allowing SSH (TCP port 22) from IAP and any source
 resource "google_compute_network_firewall_policy_rule" "allow_ssh" {
-  firewall_policy = google_compute_network_firewall_policy.familyexpenses_basic_access.name
+  firewall_policy = google_compute_network_firewall_policy.spendings_basic_access.name
   description     = "Allows SSH traffic including browser-based SSH via Google Cloud IAP"
   priority        = 1001
   direction       = "INGRESS"
@@ -124,16 +124,16 @@ resource "google_compute_network_firewall_policy_rule" "allow_ssh" {
   }
 }
 
-# Pre-reserved Static External IP for FamilyExpenses WebApi
-data "google_compute_address" "familyexpenses_webapi_ip" {
-  name   = var.familyexpenses_webapi_instance_name
+# Pre-reserved Static External IP for Spendings WebApi (`34.116.163.207`)
+data "google_compute_address" "spendings_webapi_ip" {
+  name   = "spendings-webapi"
   region = var.region
 }
 
-# 4. Virtual Machine in the Warsaw subnetwork for FamilyExpenses WebApi
-resource "google_compute_instance" "familyexpenses_webapi_vm" {
-  name         = var.familyexpenses_webapi_instance_name
-  machine_type = var.familyexpenses_webapi_machine_type
+# 4. Virtual Machine in the Warsaw subnetwork for Spendings WebApi
+resource "google_compute_instance" "spendings_webapi_vm" {
+  name         = var.spendings_webapi_instance_name
+  machine_type = var.spendings_webapi_machine_type
   zone         = var.zone
 
   boot_disk {
@@ -148,7 +148,7 @@ resource "google_compute_instance" "familyexpenses_webapi_vm" {
     subnetwork = google_compute_subnetwork.subnet.id
 
     access_config {
-      nat_ip = data.google_compute_address.familyexpenses_webapi_ip.address
+      nat_ip = data.google_compute_address.spendings_webapi_ip.address
     }
   }
 
@@ -172,11 +172,11 @@ resource "google_compute_instance" "familyexpenses_webapi_vm" {
     apt-get install -y temurin-21-jdk || apt-get install -y -t bookworm-backports openjdk-21-jdk
 
     # 2. Prepare application directory
-    mkdir -p /opt/familyexpenses-webapi
-    chmod 777 /opt/familyexpenses-webapi
+    mkdir -p /opt/spendings-webapi
+    chmod 777 /opt/spendings-webapi
 
     # 3. Setup GitHub Actions Self-Hosted Runner if credentials are provided
-    REPO="${var.familyexpenses_webapi_github_repo}"
+    REPO="${var.spendings_webapi_github_repo}"
     PAT="${var.github_pat}"
 
     if [ -n "$REPO" ] && [ -n "$PAT" ]; then
@@ -199,7 +199,7 @@ resource "google_compute_instance" "familyexpenses_webapi_vm" {
 
       if [ -n "$REG_TOKEN" ] && [ "$REG_TOKEN" != "null" ]; then
         export RUNNER_ALLOW_RUNASROOT="1"
-        ./config.sh --url "https://github.com/$${REPO}" --token "$${REG_TOKEN}" --name "${var.familyexpenses_webapi_instance_name}" --labels "${var.familyexpenses_webapi_instance_name}" --unattended --replace
+        ./config.sh --url "https://github.com/$${REPO}" --token "$${REG_TOKEN}" --name "${var.spendings_webapi_instance_name}" --labels "${var.spendings_webapi_instance_name}" --unattended --replace
         ./svc.sh install root
         ./svc.sh start
         echo "GitHub Actions Runner registered and running as a systemd service!"
@@ -214,7 +214,7 @@ resource "google_compute_instance" "familyexpenses_webapi_vm" {
 
   # Identity the Ops Agent uses to authenticate against Cloud Logging / Monitoring.
   service_account {
-    email  = google_service_account.familyexpenses_vm.email
+    email  = google_service_account.spendings_vm.email
     scopes = ["https://www.googleapis.com/auth/cloud-platform"]
   }
 

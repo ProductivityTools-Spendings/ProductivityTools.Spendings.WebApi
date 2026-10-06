@@ -1,6 +1,6 @@
-# FamilyExpenses WebApi – Terraform Infrastructure
+# Spendings WebApi – Terraform Infrastructure
 
-Infrastruktura Google Cloud Platform (GCP) zarządzana przez Terraform dla serwisu **`familyexpenses-webapi`**.
+Infrastruktura Google Cloud Platform (GCP) zarządzana przez Terraform dla serwisu **`spendings-webapi`**.
 
 ---
 
@@ -10,7 +10,7 @@ Zewnętrzny statyczny adres IP dla maszyny wirtualnej jest pobierany w [`main.tf
 
 ### Rezerwacja adresu IP przez `gcloud`:
 ```bash
-gcloud compute addresses create familyexpenses-webapi \
+gcloud compute addresses create spendings-webapi \
   --project=pwujczyk-pt \
   --region=europe-central2 \
   --network-tier=PREMIUM
@@ -23,8 +23,8 @@ gcloud compute addresses create familyexpenses-webapi \
 Utwórz plik `terraform/terraform.tfvars` (lub skopiuj z `Home.Configuration` za pomocą `./copy-tfvars.sh`):
 
 ```hcl
-github_pat                        = "ghp_..."
-familyexpenses_webapi_github_repo = "ProductivityTools-FamilyExpenses/ProductivityTools.FamilyExpenses.WebApi"
+github_pat                   = "ghp_..."
+spendings_webapi_github_repo = "ProductivityTools-Spendings/ProductivityTools.Spendings.WebApi"
 ```
 
 ---

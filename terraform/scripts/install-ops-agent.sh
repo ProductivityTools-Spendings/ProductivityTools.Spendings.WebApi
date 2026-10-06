@@ -1,6 +1,6 @@
 #!/bin/bash
 # Installs the Cloud Ops Agent and forwards the systemd journal to Cloud Logging, so that
-# application logs (unit familyexpenses-webapi) are visible in Logs Explorer
+# application logs (unit spendings-webapi) are visible in Logs Explorer
 # and not only in journalctl on the VM.
 #
 # Appended to the VM startup script in main.tf, so it runs when a machine is created.
