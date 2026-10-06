@@ -29,7 +29,7 @@ spendings_webapi_github_repo = "ProductivityTools-Spendings/ProductivityTools.Sp
 
 ---
 
-## 🛠️ Uruchamianie Terraform
+## 🛠️ Uruchamianie Terraform-x
 
 ### Alias dla `g3terraform`
 ```bash
