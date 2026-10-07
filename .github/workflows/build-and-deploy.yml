@@ -13,7 +13,7 @@ jobs:
         include:
           - target-runner: "spendings-webapi"
             server-port: "8086"
-            db-url: "jdbc:postgresql://10.10.0.2:5432/ptspendings"
+            db-url: "jdbc:postgresql://10.0.0.3:5432/ptspendings"
             db-user: "postgres"
           - target-runner: "T460Ubuntu1"
             server-port: "8086"
@@ -40,8 +40,22 @@ jobs:
         distribution: 'temurin'
         cache: 'gradle'
 
-    - name: Build with Gradle
+    - name: Ensure PostgreSQL database exists (local PostgreSQL)
+      if: matrix.target-runner == 'T460Ubuntu1'
       run: |
+        echo "Ensuring database 'ptspendings' exists on local PostgreSQL..."
+        sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname = 'ptspendings'" | grep -q 1 || sudo -u postgres createdb ptspendings
+
+    - name: Build with Gradle
+      env:
+        SERVER_PORT: ${{ matrix.server-port }}
+        DB_URL: ${{ matrix.db-url }}
+        DB_USERNAME: ${{ matrix.db-user }}
+        DB_PASS: ${{ secrets.DB_PASSWORD }}
+      run: |
+        if [ -n "$DB_PASS" ]; then
+          export DB_PASSWORD="$DB_PASS"
+        fi
         chmod +x gradlew
         ./gradlew --stop
         ./gradlew clean build --rerun-tasks
