@@ -20,6 +20,12 @@ resource "google_project_service" "iap" {
   disable_on_destroy = false
 }
 
+# Enable Cloud SQL Admin API
+resource "google_project_service" "sqladmin" {
+  service            = "sqladmin.googleapis.com"
+  disable_on_destroy = false
+}
+
 # Enable Cloud Logging / Monitoring so the Ops Agent on the VM can ship logs and metrics
 resource "google_project_service" "logging" {
   service            = "logging.googleapis.com"
@@ -220,4 +226,67 @@ resource "google_compute_instance" "spendings_webapi_vm" {
 
   # Lets Terraform stop the VM when a change requires it instead of failing the apply.
   allow_stopping_for_update = true
+}
+
+# 5. Cloud SQL PostgreSQL Instance with Private Service Connect (PSC) enabled
+resource "google_sql_database_instance" "postgres" {
+  name                = var.db_instance_name
+  database_version    = var.db_version
+  region              = var.region
+  deletion_protection = false
+
+  settings {
+    tier = var.db_tier
+
+    ip_configuration {
+      ipv4_enabled = false
+
+      psc_config {
+        psc_enabled               = true
+        allowed_consumer_projects = [var.project_id]
+      }
+    }
+
+    backup_configuration {
+      enabled = false
+    }
+  }
+
+  depends_on = [
+    google_project_service.sqladmin
+  ]
+}
+
+# Spendings WebApi Database inside Cloud SQL
+resource "google_sql_database" "spendings_webapi_database" {
+  name     = var.spendings_webapi_db_name
+  instance = google_sql_database_instance.postgres.name
+}
+
+# PostgreSQL Database User
+resource "google_sql_user" "db_user" {
+  name            = var.db_user
+  instance        = google_sql_database_instance.postgres.name
+  password        = var.db_password
+  deletion_policy = "ABANDON"
+}
+
+# 6. Private Service Connect (PSC) Endpoint in consumer Subnetwork
+# Internal IP reserved for the PSC endpoint within the Warsaw subnet
+resource "google_compute_address" "db_psc_ip" {
+  name         = "spendings-db-psc-ip"
+  subnetwork   = google_compute_subnetwork.subnet.id
+  address_type = "INTERNAL"
+  region       = var.region
+}
+
+# Forwarding rule pointing to the Cloud SQL PSC Service Attachment
+resource "google_compute_forwarding_rule" "db_psc_endpoint" {
+  name                  = "spendings-db-psc-endpoint"
+  region                = var.region
+  network               = google_compute_network.vpc_network.id
+  subnetwork            = google_compute_subnetwork.subnet.id
+  ip_address            = google_compute_address.db_psc_ip.self_link
+  target                = google_sql_database_instance.postgres.psc_service_attachment_link
+  load_balancing_scheme = ""
 }
