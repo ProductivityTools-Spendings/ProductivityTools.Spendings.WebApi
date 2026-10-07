@@ -1,7 +1,7 @@
 package top.productivitytools.spendings.webapi.services;
 
 import org.junit.jupiter.api.Test;
-import top.productivitytools.spendings.webapi.dto.ParsedExpense;
+import top.productivitytools.spendings.webapi.dto.ParsedSpending;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -24,6 +24,10 @@ class MBankEmailParserTest {
                         <h1>Powiadomienie e-mail - 2026-10-05</h1>
                         <table>
                           <tbody>
+                            <tr>
+                              <td>Dane adresata:</td>
+                              <td>PAWE GRZEGORZ WUJCZYK PWUJCZYK@GMAIL.COM</td>
+                            </tr>
                             <tr>
                               <td>Czas</td>
                               <td>Szczegóły</td>
@@ -62,12 +66,12 @@ class MBankEmailParserTest {
                 </html>
                 """;
 
-        List<ParsedExpense> expenses = parser.parseHtmlAttachment("msg123", html);
+        List<ParsedSpending> spendings = parser.parseHtmlAttachment("msg123", html);
 
-        assertEquals(5, expenses.size());
+        assertEquals(5, spendings.size());
 
-        ParsedExpense card = expenses.get(0);
-        assertEquals("msg123-1", card.operationId());
+        ParsedSpending card = spendings.get(0);
+        assertEquals("msg123-2", card.operationId());
         assertEquals("2026-10-05", card.operationDate());
         assertEquals("10:15:00", card.operationTime());
         assertEquals("Autoryzacja karty", card.operationType());
@@ -79,8 +83,8 @@ class MBankEmailParserTest {
         assertEquals("1200,00", card.amountLeft());
         assertEquals("PLN", card.amountLeftCurrency());
 
-        ParsedExpense outgoing = expenses.get(1);
-        assertEquals("msg123-2", outgoing.operationId());
+        ParsedSpending outgoing = spendings.get(1);
+        assertEquals("msg123-3", outgoing.operationId());
         assertEquals("Przelew wychodzacy", outgoing.operationType());
         assertEquals("*5678", outgoing.srcAccount());
         assertEquals("*9999", outgoing.dstAccount());
@@ -90,8 +94,8 @@ class MBankEmailParserTest {
         assertEquals("1050,00", outgoing.amountLeft());
         assertEquals("PLN", outgoing.amountLeftCurrency());
 
-        ParsedExpense incoming = expenses.get(2);
-        assertEquals("msg123-3", incoming.operationId());
+        ParsedSpending incoming = spendings.get(2);
+        assertEquals("msg123-4", incoming.operationId());
         assertEquals("Przelew przychodzący", incoming.operationType());
         assertEquals("*1111", incoming.srcAccount());
         assertEquals("*5678", incoming.dstAccount());
@@ -101,8 +105,8 @@ class MBankEmailParserTest {
         assertEquals("1550,50", incoming.amountLeft());
         assertEquals("PLN", incoming.amountLeftCurrency());
 
-        ParsedExpense debit = expenses.get(3);
-        assertEquals("msg123-4", debit.operationId());
+        ParsedSpending debit = spendings.get(3);
+        assertEquals("msg123-5", debit.operationId());
         assertEquals("Obciazenie", debit.operationType());
         assertEquals("*5678", debit.srcAccount());
         assertEquals("", debit.dstAccount());
@@ -112,8 +116,8 @@ class MBankEmailParserTest {
         assertEquals("1520,51", debit.amountLeft());
         assertEquals("PLN", debit.amountLeftCurrency());
 
-        ParsedExpense credit = expenses.get(4);
-        assertEquals("msg123-5", credit.operationId());
+        ParsedSpending credit = spendings.get(4);
+        assertEquals("msg123-6", credit.operationId());
         assertEquals("Uznanie", credit.operationType());
         assertEquals("", credit.srcAccount());
         assertEquals("*5678", credit.dstAccount());
