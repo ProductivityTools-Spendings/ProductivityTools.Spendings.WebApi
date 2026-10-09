@@ -1,9 +1,11 @@
 package top.productivitytools.spendings.webapi.services;
 
 import org.junit.jupiter.api.Test;
+import top.productivitytools.spendings.webapi.dto.ParsedAccountBalance;
 import top.productivitytools.spendings.webapi.dto.ParsedSpending;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -126,5 +128,64 @@ class MBankEmailParserTest {
         assertEquals("Zwrot srodkow", credit.name());
         assertEquals("1620,51", credit.amountLeft());
         assertEquals("PLN", credit.amountLeftCurrency());
+    }
+
+    @Test
+    void shouldParseBalanceRowsAndSkipThemInSpendings() {
+        String html = """
+                <html><body><table><tbody><tr><td>
+                  <h1>Powiadomienie e-mail - 2026-09-02</h1>
+                  <table><tbody>
+                    <tr><td>Czas operacji (GG:MM)</td><td>Opis operacji</td></tr>
+                    <tr><td>05:40</td><td>mBank: Saldo rach. 42109862 w dniu 2026-08-31. Dostepne 6491,93 PLN</td></tr>
+                    <tr><td>05:40</td><td>mBank: Saldo rach. 85246207 w dniu 2026-09-02. Dostepne 0,00 PLN</td></tr>
+                    <tr><td>05:40</td><td>mBank: Saldo rach. 00561357 w dniu 2026-08-31. Dostepne 1026,85 EUR</td></tr>
+                    <tr><td>05:40</td><td>mBank: Saldo rach. 00561332 w dniu 2026-09-02. Dostepne 0,00 USD</td></tr>
+                    <tr><td>06:10</td><td>mBank: Przelew wych. z rach. 85270738 na rach. 7116...796001 kwota 2640,00 PLN dla SZKOA PODSTAWOWA NR; CZESNE MAGDA...; Dost. 3060,00 PLN</td></tr>
+                    <tr><td>07:52</td><td>mBank: Odmowa autoryzacji 4838***3703: BRAK RODKW. AWS EMEA aws.amazon.co. Naleznosc: 1,23 USD. Dostepne: 0,00 USD.</td></tr>
+                  </tbody></table>
+                </td></tr></tbody></table></body></html>
+                """;
+
+        List<ParsedAccountBalance> balances = parser.parseAccountBalances("msg9", html);
+        assertEquals(4, balances.size());
+
+        ParsedAccountBalance first = balances.get(0);
+        assertEquals("msg9-1", first.operationId());
+        assertEquals("42109862", first.account());
+        assertEquals(LocalDate.of(2026, 8, 31), first.balanceDate());
+        assertEquals("05:40", first.operationTime());
+        assertEquals(new BigDecimal("6491.93"), first.amount());
+        assertEquals("PLN", first.currency());
+
+        assertEquals(new BigDecimal("0.00"), balances.get(1).amount());
+        assertEquals("85246207", balances.get(1).account());
+        assertEquals(LocalDate.of(2026, 9, 2), balances.get(1).balanceDate());
+
+        assertEquals("EUR", balances.get(2).currency());
+        assertEquals(new BigDecimal("1026.85"), balances.get(2).amount());
+
+        assertEquals("USD", balances.get(3).currency());
+        assertEquals("00561332", balances.get(3).account());
+
+        // Balance rows must not become spendings and must not break parsing of the real transfer
+        List<ParsedSpending> spendings = parser.parseHtmlAttachment("msg9", html);
+        assertEquals(1, spendings.size());
+        assertEquals("Przelew wychodzacy", spendings.get(0).operationType());
+        assertEquals(new BigDecimal("-2640.00"), spendings.get(0).amount());
+        assertEquals("85270738", spendings.get(0).srcAccount());
+    }
+
+    @Test
+    void shouldReturnNullForNonBalanceRow() {
+        assertNull(parser.parseBalanceRow("x-1", "10:00", "mBank: Autoryzacja karty *1234: SKLEP. Kwota: 1,00 PLN. Dost.: 10,00 PLN."));
+        assertNull(parser.parseTransferRow("x-1", "2026-09-02", "05:40",
+                "mBank: Saldo rach. 42109862 w dniu 2026-08-31. Dostepne 6491,93 PLN"));
+    }
+
+    @Test
+    void shouldRejectMalformedBalanceRow() {
+        assertThrows(IllegalArgumentException.class,
+                () -> parser.parseBalanceRow("x-1", "05:40", "mBank: Saldo rach. 42109862 cos dziwnego"));
     }
 }
