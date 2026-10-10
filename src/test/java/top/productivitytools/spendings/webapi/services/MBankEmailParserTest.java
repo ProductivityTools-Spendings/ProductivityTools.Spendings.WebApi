@@ -4,7 +4,10 @@ import org.junit.jupiter.api.Test;
 import top.productivitytools.spendings.webapi.dto.ParsedAccountBalance;
 import top.productivitytools.spendings.webapi.dto.ParsedSpending;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -187,5 +190,58 @@ class MBankEmailParserTest {
     void shouldRejectMalformedBalanceRow() {
         assertThrows(IllegalArgumentException.class,
                 () -> parser.parseBalanceRow("x-1", "05:40", "mBank: Saldo rach. 42109862 cos dziwnego"));
+    }
+
+    @Test
+    void shouldParseRealDailyNotificationWithMangledPolishCharacters() throws IOException {
+        String html;
+        try (InputStream in = getClass().getResourceAsStream("/mbank/notification-2026-09-02.html")) {
+            assertNotNull(in, "fixture missing");
+            html = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+        }
+
+        List<ParsedAccountBalance> balances = parser.parseAccountBalances("real", html);
+        assertEquals(13, balances.size());
+        assertEquals("42109862", balances.get(0).account());
+        assertEquals(LocalDate.of(2026, 8, 31), balances.get(0).balanceDate());
+        assertEquals(new BigDecimal("6491.93"), balances.get(0).amount());
+        assertEquals("PLN", balances.get(0).currency());
+        assertEquals(new BigDecimal("10000.00"), balances.get(2).amount());
+        assertEquals("EUR", balances.get(11).currency());
+        assertEquals(new BigDecimal("235.87"), balances.get(11).amount());
+
+        List<ParsedSpending> spendings = parser.parseHtmlAttachment("real", html);
+        // 2 outgoing + 2 incoming + 4 card + 6 debits = 14 (balances and "Odmowa autoryzacji" skipped)
+        assertEquals(14, spendings.size());
+        assertTrue(spendings.stream().allMatch(s -> "2026-09-02".equals(s.operationDate())));
+
+        ParsedSpending outgoing = spendings.get(0);
+        assertEquals("Przelew wychodzacy", outgoing.operationType());
+        assertEquals("06:10", outgoing.operationTime());
+        assertEquals("85270738", outgoing.srcAccount());
+        assertEquals("7116...796001", outgoing.dstAccount());
+        assertEquals(new BigDecimal("-2640.00"), outgoing.amount());
+        assertEquals("SZKOA PODSTAWOWA NR; CZESNE MAGDA...;", outgoing.name());
+        assertEquals("3060,00", outgoing.amountLeft());
+
+        ParsedSpending incoming = spendings.get(1);
+        assertEquals("Przelew przychodzący", incoming.operationType());
+        assertEquals("42109862", incoming.dstAccount());
+        assertEquals(new BigDecimal("4000.00"), incoming.amount());
+        assertEquals("20243,70", incoming.amountLeft());
+
+        ParsedSpending card = spendings.get(3);
+        assertEquals("Autoryzacja karty", card.operationType());
+        assertEquals("5575***5205", card.srcAccount());
+        assertEquals("Allegro Poznan", card.name());
+        assertEquals(new BigDecimal("-59.99"), card.amount());
+        assertEquals("20183,71", card.amountLeft());
+
+        ParsedSpending debit = spendings.get(13);
+        assertEquals("Obciazenie", debit.operationType());
+        assertEquals("42109862", debit.srcAccount());
+        assertEquals(new BigDecimal("-990.70"), debit.amount());
+        assertEquals("ZARA.COM", debit.name());
+        assertEquals("13953,44", debit.amountLeft());
     }
 }
