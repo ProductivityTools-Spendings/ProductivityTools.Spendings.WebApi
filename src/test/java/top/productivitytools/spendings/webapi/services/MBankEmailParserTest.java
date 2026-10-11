@@ -280,6 +280,14 @@ class MBankEmailParserTest {
     }
 
     @Test
+    void shouldSkipCardLifecycleMessages() {
+        assertNull(parser.parseTransferRow("x-1", "2025-03-31", "00:17",
+                "mBank: Wydano karte 4056***1866 dla PAWE\uFFFD WUJCZYK do rach.: 42109862. Karta zostanie przeslana poczta."));
+        assertNull(parser.parseTransferRow("x-2", "2025-03-31", "10:00",
+                "mBank: Karta 4056***1866 zostala aktywowana."));
+    }
+
+    @Test
     void shouldParseCardTopUpAndForeignCurrencyAuthorization() throws IOException {
         String html = readFixture("/mbank/notification-2025-02-16-card-topup.html");
 
