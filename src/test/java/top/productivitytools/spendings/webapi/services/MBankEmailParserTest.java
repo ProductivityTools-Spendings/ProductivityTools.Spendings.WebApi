@@ -2,6 +2,7 @@ package top.productivitytools.spendings.webapi.services;
 
 import org.junit.jupiter.api.Test;
 import top.productivitytools.spendings.webapi.dto.ParsedAccountBalance;
+import top.productivitytools.spendings.webapi.dto.ParsedCardAuthorization;
 import top.productivitytools.spendings.webapi.dto.ParsedSpending;
 
 import java.io.IOException;
@@ -73,22 +74,22 @@ class MBankEmailParserTest {
 
         List<ParsedSpending> spendings = parser.parseHtmlAttachment("msg123", html);
 
-        assertEquals(5, spendings.size());
+        assertEquals(4, spendings.size());
 
-        ParsedSpending card = spendings.get(0);
+        List<ParsedCardAuthorization> auths = parser.parseCardAuthorizations("msg123", html);
+        assertEquals(1, auths.size());
+        ParsedCardAuthorization card = auths.get(0);
         assertEquals("msg123-2", card.operationId());
         assertEquals("2026-10-05", card.operationDate());
         assertEquals("10:15:00", card.operationTime());
-        assertEquals("Autoryzacja karty", card.operationType());
-        assertEquals("*1234", card.srcAccount());
-        assertEquals("", card.dstAccount());
+        assertEquals("*1234", card.card());
         assertEquals(new BigDecimal("-45.60"), card.amount());
         assertEquals("PLN", card.currency());
-        assertEquals("BIEDRONKA", card.name());
+        assertEquals("BIEDRONKA", card.merchant());
         assertEquals("1200,00", card.amountLeft());
         assertEquals("PLN", card.amountLeftCurrency());
 
-        ParsedSpending outgoing = spendings.get(1);
+        ParsedSpending outgoing = spendings.get(0);
         assertEquals("msg123-3", outgoing.operationId());
         assertEquals("Przelew wychodzacy", outgoing.operationType());
         assertEquals("*5678", outgoing.srcAccount());
@@ -99,7 +100,7 @@ class MBankEmailParserTest {
         assertEquals("1050,00", outgoing.amountLeft());
         assertEquals("PLN", outgoing.amountLeftCurrency());
 
-        ParsedSpending incoming = spendings.get(2);
+        ParsedSpending incoming = spendings.get(1);
         assertEquals("msg123-4", incoming.operationId());
         assertEquals("Przelew przychodzący", incoming.operationType());
         assertEquals("*1111", incoming.srcAccount());
@@ -110,7 +111,7 @@ class MBankEmailParserTest {
         assertEquals("1550,50", incoming.amountLeft());
         assertEquals("PLN", incoming.amountLeftCurrency());
 
-        ParsedSpending debit = spendings.get(3);
+        ParsedSpending debit = spendings.get(2);
         assertEquals("msg123-5", debit.operationId());
         assertEquals("Obciazenie", debit.operationType());
         assertEquals("*5678", debit.srcAccount());
@@ -121,7 +122,7 @@ class MBankEmailParserTest {
         assertEquals("1520,51", debit.amountLeft());
         assertEquals("PLN", debit.amountLeftCurrency());
 
-        ParsedSpending credit = spendings.get(4);
+        ParsedSpending credit = spendings.get(3);
         assertEquals("msg123-6", credit.operationId());
         assertEquals("Uznanie", credit.operationType());
         assertEquals("", credit.srcAccount());
@@ -207,8 +208,8 @@ class MBankEmailParserTest {
         assertEquals(new BigDecimal("235.87"), balances.get(11).amount());
 
         List<ParsedSpending> spendings = parser.parseHtmlAttachment("real", html);
-        // 2 outgoing + 2 incoming + 4 card + 6 debits = 14 (balances and "Odmowa autoryzacji" skipped)
-        assertEquals(14, spendings.size());
+        // 2 outgoing + 2 incoming + 6 debits = 10 (card auths, balances and "Odmowa autoryzacji" skipped)
+        assertEquals(10, spendings.size());
         assertTrue(spendings.stream().allMatch(s -> "2026-09-02".equals(s.operationDate())));
 
         ParsedSpending outgoing = spendings.get(0);
@@ -226,14 +227,17 @@ class MBankEmailParserTest {
         assertEquals(new BigDecimal("4000.00"), incoming.amount());
         assertEquals("20243,70", incoming.amountLeft());
 
-        ParsedSpending card = spendings.get(3);
-        assertEquals("Autoryzacja karty", card.operationType());
-        assertEquals("5575***5205", card.srcAccount());
-        assertEquals("Allegro Poznan", card.name());
+        List<ParsedCardAuthorization> auths = parser.parseCardAuthorizations("real", html);
+        assertEquals(4, auths.size());
+        ParsedCardAuthorization card = auths.get(0);
+        assertEquals("5575***5205", card.card());
+        assertEquals("Allegro Poznan", card.merchant());
         assertEquals(new BigDecimal("-59.99"), card.amount());
+        assertEquals("PLN", card.currency());
         assertEquals("20183,71", card.amountLeft());
+        assertEquals("PLN", card.amountLeftCurrency());
 
-        ParsedSpending debit = spendings.get(13);
+        ParsedSpending debit = spendings.get(9);
         assertEquals("Obciazenie", debit.operationType());
         assertEquals("42109862", debit.srcAccount());
         assertEquals(new BigDecimal("-990.70"), debit.amount());
@@ -246,8 +250,8 @@ class MBankEmailParserTest {
         String html = readFixture("/mbank/notification-2024-09-28-legacy.html");
 
         List<ParsedSpending> spendings = parser.parseHtmlAttachment("legacy", html);
-        // 1 credit + 3 debits + 1 card; logins, "Niepoprawne logowanie" and "Rachunek ... jest w pelni aktywny" skipped
-        assertEquals(5, spendings.size());
+        // 1 credit + 3 debits; card auth, logins, "Niepoprawne logowanie" and "Rachunek ... jest w pelni aktywny" skipped
+        assertEquals(4, spendings.size());
         assertTrue(spendings.stream().allMatch(s -> "2024-09-28".equals(s.operationDate())));
 
         ParsedSpending credit = spendings.get(0);
@@ -264,11 +268,12 @@ class MBankEmailParserTest {
         assertEquals(new BigDecimal("-80.00"), debit.amount());
         assertEquals("SALON FRYZJE...", debit.name());
 
-        ParsedSpending card = spendings.get(4);
-        assertEquals("Autoryzacja karty", card.operationType());
-        assertEquals("ZABKA Z7239 K.2 WARSZAWA", card.name());
-        assertEquals(new BigDecimal("-8.99"), card.amount());
-        assertEquals("7992,73", card.amountLeft());
+        List<ParsedCardAuthorization> auths = parser.parseCardAuthorizations("legacy", html);
+        assertEquals(1, auths.size());
+        assertEquals("5575***5205", auths.get(0).card());
+        assertEquals("ZABKA Z7239 K.2 WARSZAWA", auths.get(0).merchant());
+        assertEquals(new BigDecimal("-8.99"), auths.get(0).amount());
+        assertEquals("7992,73", auths.get(0).amountLeft());
 
         assertTrue(parser.parseAccountBalances("legacy", html).isEmpty());
     }
@@ -303,8 +308,8 @@ class MBankEmailParserTest {
         assertEquals("PLN", balances.get(1).currency());
 
         List<ParsedSpending> spendings = parser.parseHtmlAttachment("fx", html);
-        // 2 outgoing + 1 incoming + 7 debits + 1 credit + 1 card = 12; login and balances skipped
-        assertEquals(12, spendings.size());
+        // 2 outgoing + 1 incoming + 7 debits + 1 credit = 11; card auth, login and balances skipped
+        assertEquals(11, spendings.size());
 
         ParsedSpending usdOut = spendings.get(0);
         assertEquals("Przelew wychodzacy", usdOut.operationType());
@@ -352,10 +357,10 @@ class MBankEmailParserTest {
         String html = readFixture("/mbank/notification-2025-02-16-card-topup.html");
 
         List<ParsedSpending> spendings = parser.parseHtmlAttachment("topup", html);
-        // 2 card auths + 3 debits + 1 top-up; login confirmation skipped
-        assertEquals(6, spendings.size());
+        // 3 debits + 1 top-up; card auths and login confirmation skipped
+        assertEquals(4, spendings.size());
 
-        ParsedSpending topUp = spendings.get(4);
+        ParsedSpending topUp = spendings.get(3);
         assertEquals("Zaladowanie karty", topUp.operationType());
         assertEquals("22:10", topUp.operationTime());
         assertEquals("83018384", topUp.srcAccount());
@@ -366,10 +371,11 @@ class MBankEmailParserTest {
         assertEquals("39,92", topUp.amountLeft());
         assertEquals("PLN", topUp.amountLeftCurrency());
 
-        ParsedSpending eurAuth = spendings.get(5);
-        assertEquals("Autoryzacja karty", eurAuth.operationType());
-        assertEquals("4281***3044", eurAuth.srcAccount());
-        assertEquals("MICROSOFT PAYMENTS DUBLIN", eurAuth.name());
+        List<ParsedCardAuthorization> auths = parser.parseCardAuthorizations("topup", html);
+        assertEquals(2, auths.size());
+        ParsedCardAuthorization eurAuth = auths.get(1);
+        assertEquals("4281***3044", eurAuth.card());
+        assertEquals("MICROSOFT PAYMENTS DUBLIN", eurAuth.merchant());
         assertEquals(new BigDecimal("-2.43"), eurAuth.amount());
         assertEquals("EUR", eurAuth.currency());
         assertEquals("19,84", eurAuth.amountLeft());
