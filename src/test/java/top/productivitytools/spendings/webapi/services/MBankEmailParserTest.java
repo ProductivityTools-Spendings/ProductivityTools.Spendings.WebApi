@@ -279,6 +279,41 @@ class MBankEmailParserTest {
                 "mBank: Rachunek EKONTO 85246191 jest w pelni aktywny. Zapraszamy do korzystania z us\uFFFDug mBanku."));
     }
 
+    @Test
+    void shouldParseCardTopUpAndForeignCurrencyAuthorization() throws IOException {
+        String html = readFixture("/mbank/notification-2025-02-16-card-topup.html");
+
+        List<ParsedSpending> spendings = parser.parseHtmlAttachment("topup", html);
+        // 2 card auths + 3 debits + 1 top-up; login confirmation skipped
+        assertEquals(6, spendings.size());
+
+        ParsedSpending topUp = spendings.get(4);
+        assertEquals("Zaladowanie karty", topUp.operationType());
+        assertEquals("22:10", topUp.operationTime());
+        assertEquals("83018384", topUp.srcAccount());
+        assertEquals("4281***3044", topUp.dstAccount());
+        assertEquals(new BigDecimal("-30.00"), topUp.amount());
+        assertEquals("PLN", topUp.currency());
+        assertEquals("Zaladowanie karty 4281***3044", topUp.name());
+        assertEquals("39,92", topUp.amountLeft());
+        assertEquals("PLN", topUp.amountLeftCurrency());
+
+        ParsedSpending eurAuth = spendings.get(5);
+        assertEquals("Autoryzacja karty", eurAuth.operationType());
+        assertEquals("4281***3044", eurAuth.srcAccount());
+        assertEquals("MICROSOFT PAYMENTS DUBLIN", eurAuth.name());
+        assertEquals(new BigDecimal("-2.43"), eurAuth.amount());
+        assertEquals("EUR", eurAuth.currency());
+        assertEquals("19,84", eurAuth.amountLeft());
+        assertEquals("PLN", eurAuth.amountLeftCurrency());
+    }
+
+    @Test
+    void shouldRejectMalformedCardTopUp() {
+        assertThrows(IllegalArgumentException.class,
+                () -> parser.parseTransferRow("x-1", "2025-02-16", "22:10", "mBank: Zaladowanie karty: cos innego"));
+    }
+
     private String readFixture(String path) throws IOException {
         try (InputStream in = getClass().getResourceAsStream(path)) {
             assertNotNull(in, "fixture missing: " + path);
