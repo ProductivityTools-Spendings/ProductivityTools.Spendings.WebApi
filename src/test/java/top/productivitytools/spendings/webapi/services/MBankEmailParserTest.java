@@ -181,7 +181,7 @@ class MBankEmailParserTest {
 
     @Test
     void shouldReturnNullForNonBalanceRow() {
-        assertNull(parser.parseBalanceRow("x-1", "10:00", "mBank: Autoryzacja karty *1234: SKLEP. Kwota: 1,00 PLN. Dost.: 10,00 PLN."));
+        assertNull(parser.parseBalanceRow("x-1", "2026-09-02", "10:00", "mBank: Autoryzacja karty *1234: SKLEP. Kwota: 1,00 PLN. Dost.: 10,00 PLN."));
         assertNull(parser.parseTransferRow("x-1", "2026-09-02", "05:40",
                 "mBank: Saldo rach. 42109862 w dniu 2026-08-31. Dostepne 6491,93 PLN"));
     }
@@ -189,7 +189,7 @@ class MBankEmailParserTest {
     @Test
     void shouldRejectMalformedBalanceRow() {
         assertThrows(IllegalArgumentException.class,
-                () -> parser.parseBalanceRow("x-1", "05:40", "mBank: Saldo rach. 42109862 cos dziwnego"));
+                () -> parser.parseBalanceRow("x-1", "2026-09-02", "05:40", "mBank: Saldo rach. 42109862 cos dziwnego"));
     }
 
     @Test
@@ -285,6 +285,66 @@ class MBankEmailParserTest {
                 "mBank: Wydano karte 4056***1866 dla PAWE\uFFFD WUJCZYK do rach.: 42109862. Karta zostanie przeslana poczta."));
         assertNull(parser.parseTransferRow("x-2", "2025-03-31", "10:00",
                 "mBank: Karta 4056***1866 zostala aktywowana."));
+    }
+
+    @Test
+    void shouldParseDatelessBalancesUsingNotificationDateAndForeignCurrencyRows() throws IOException {
+        String html = readFixture("/mbank/notification-2025-07-30-fx.html");
+
+        List<ParsedAccountBalance> balances = parser.parseAccountBalances("fx", html);
+        assertEquals(2, balances.size());
+        assertEquals("17658578", balances.get(0).account());
+        assertEquals(LocalDate.of(2025, 7, 30), balances.get(0).balanceDate()); // from the header
+        assertEquals("14:26", balances.get(0).operationTime());
+        assertEquals(new BigDecimal("0.00"), balances.get(0).amount());
+        assertEquals("USD", balances.get(0).currency());
+        assertEquals("42109862", balances.get(1).account());
+        assertEquals(new BigDecimal("4516.27"), balances.get(1).amount());
+        assertEquals("PLN", balances.get(1).currency());
+
+        List<ParsedSpending> spendings = parser.parseHtmlAttachment("fx", html);
+        // 2 outgoing + 1 incoming + 7 debits + 1 credit + 1 card = 12; login and balances skipped
+        assertEquals(12, spendings.size());
+
+        ParsedSpending usdOut = spendings.get(0);
+        assertEquals("Przelew wychodzacy", usdOut.operationType());
+        assertEquals("17658578", usdOut.srcAccount());
+        assertEquals("PL06...001003", usdOut.dstAccount());
+        assertEquals(new BigDecimal("-10000.00"), usdOut.amount());
+        assertEquals("USD", usdOut.currency());
+        assertEquals("130492,02", usdOut.amountLeft());
+        assertEquals("USD", usdOut.amountLeftCurrency());
+
+        ParsedSpending incoming = spendings.get(3);
+        assertEquals("Przelew przychodzący", incoming.operationType());
+        assertEquals("1716...000009", incoming.srcAccount());
+        assertEquals("42109862", incoming.dstAccount());
+        assertEquals(new BigDecimal("38553.07"), incoming.amount());
+        assertEquals("43069,34", incoming.amountLeft());
+
+        ParsedSpending usdDebit = spendings.get(5);
+        assertEquals("Obciazenie", usdDebit.operationType());
+        assertEquals(new BigDecimal("-130492.02"), usdDebit.amount());
+        assertEquals("USD", usdDebit.currency());
+        assertEquals("OBC.NAT.TR.FX", usdDebit.name());
+        assertEquals("0,00", usdDebit.amountLeft());
+
+        ParsedSpending fxCredit = spendings.get(6);
+        assertEquals("Uznanie", fxCredit.operationType());
+        assertEquals(new BigDecimal("482911.82"), fxCredit.amount());
+        assertEquals("UZN.NAT.TR.FX", fxCredit.name());
+    }
+
+    @Test
+    void shouldParseDatelessBalanceRow() {
+        ParsedAccountBalance b = parser.parseBalanceRow("x-1", "2025-07-30", "14:26",
+                "mBank: Saldo rach. 17658578 Dostepne 0,00 USD.");
+        assertNotNull(b);
+        assertEquals(LocalDate.of(2025, 7, 30), b.balanceDate());
+        assertEquals("USD", b.currency());
+
+        assertThrows(IllegalArgumentException.class,
+                () -> parser.parseBalanceRow("x-1", "", "14:26", "mBank: Saldo rach. 17658578 Dostepne 0,00 USD."));
     }
 
     @Test
