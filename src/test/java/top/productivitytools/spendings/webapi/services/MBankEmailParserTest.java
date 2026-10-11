@@ -194,11 +194,7 @@ class MBankEmailParserTest {
 
     @Test
     void shouldParseRealDailyNotificationWithMangledPolishCharacters() throws IOException {
-        String html;
-        try (InputStream in = getClass().getResourceAsStream("/mbank/notification-2026-09-02.html")) {
-            assertNotNull(in, "fixture missing");
-            html = new String(in.readAllBytes(), StandardCharsets.UTF_8);
-        }
+        String html = readFixture("/mbank/notification-2026-09-02.html");
 
         List<ParsedAccountBalance> balances = parser.parseAccountBalances("real", html);
         assertEquals(13, balances.size());
@@ -243,5 +239,50 @@ class MBankEmailParserTest {
         assertEquals(new BigDecimal("-990.70"), debit.amount());
         assertEquals("ZARA.COM", debit.name());
         assertEquals("13953,44", debit.amountLeft());
+    }
+
+    @Test
+    void shouldParseLegacyTemplateAndSkipInformationalMessages() throws IOException {
+        String html = readFixture("/mbank/notification-2024-09-28-legacy.html");
+
+        List<ParsedSpending> spendings = parser.parseHtmlAttachment("legacy", html);
+        // 1 credit + 3 debits + 1 card; logins, "Niepoprawne logowanie" and "Rachunek ... jest w pelni aktywny" skipped
+        assertEquals(5, spendings.size());
+        assertTrue(spendings.stream().allMatch(s -> "2024-09-28".equals(s.operationDate())));
+
+        ParsedSpending credit = spendings.get(0);
+        assertEquals("Uznanie", credit.operationType());
+        assertEquals("15:56", credit.operationTime());
+        assertEquals("42109862", credit.dstAccount());
+        assertEquals(new BigDecimal("11.99"), credit.amount());
+        assertEquals("CARREFOUR.PL...", credit.name());
+        assertEquals("8001,72", credit.amountLeft());
+        assertEquals("PLN", credit.amountLeftCurrency());
+
+        ParsedSpending debit = spendings.get(1);
+        assertEquals("Obciazenie", debit.operationType());
+        assertEquals(new BigDecimal("-80.00"), debit.amount());
+        assertEquals("SALON FRYZJE...", debit.name());
+
+        ParsedSpending card = spendings.get(4);
+        assertEquals("Autoryzacja karty", card.operationType());
+        assertEquals("ZABKA Z7239 K.2 WARSZAWA", card.name());
+        assertEquals(new BigDecimal("-8.99"), card.amount());
+        assertEquals("7992,73", card.amountLeft());
+
+        assertTrue(parser.parseAccountBalances("legacy", html).isEmpty());
+    }
+
+    @Test
+    void shouldSkipAccountActivationMessage() {
+        assertNull(parser.parseTransferRow("x-1", "2024-09-28", "17:06",
+                "mBank: Rachunek EKONTO 85246191 jest w pelni aktywny. Zapraszamy do korzystania z us\uFFFDug mBanku."));
+    }
+
+    private String readFixture(String path) throws IOException {
+        try (InputStream in = getClass().getResourceAsStream(path)) {
+            assertNotNull(in, "fixture missing: " + path);
+            return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+        }
     }
 }
