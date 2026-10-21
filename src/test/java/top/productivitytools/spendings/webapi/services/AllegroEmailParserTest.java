@@ -7,6 +7,9 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -56,5 +59,16 @@ class AllegroEmailParserTest {
         assertEquals(new BigDecimal("49.98"), second.itemCost());
         assertEquals("2", second.itemCount());
         assertEquals("24.99", second.itemPrice());
+    }
+
+    @Test
+    void shouldParseRealCartWithPaymentEmail() throws Exception {
+        String html = Files.readString(Path.of("src/test/resources/allegro/cart-with-payment-2024-02-15.html"), StandardCharsets.UTF_8);
+        List<ParsedAllegroPurchase> purchases = parser.parseEmailBody("msgCart1", OffsetDateTime.parse("2024-02-15T18:54:59Z"), html);
+        assertEquals(5, purchases.size());
+        assertEquals(new BigDecimal("99.92"), purchases.get(0).fullPrice());
+        assertEquals("Dobra pamięć, zła pamięć - Ewa Woydyłło (11897281239)", purchases.get(0).itemName());
+        assertEquals(new BigDecimal("25.70"), purchases.get(0).itemCost());
+        assertEquals(new BigDecimal("19.26"), purchases.get(4).itemCost());
     }
 }
