@@ -74,8 +74,13 @@ public class SpendingController {
     /** Result of a manual enrichment run: how many rows were filled and how many are still empty. */
     public record FillResult(int updated, int remainingEmpty) {}
 
+    /** Newest first; {@code limit} (optional, > 0) returns only the latest N transactions. */
     @GetMapping
-    public List<SpendingResponse> getAllSpendings() {
+    public List<SpendingResponse> getAllSpendings(
+            @org.springframework.web.bind.annotation.RequestParam(value = "limit", required = false) Integer limit) {
+        if (limit != null && limit > 0) {
+            return jdbcTemplate.query(SELECT_SPENDINGS_WITH_DETAILS + " LIMIT ?", SPENDING_ROW_MAPPER, limit);
+        }
         return jdbcTemplate.query(SELECT_SPENDINGS_WITH_DETAILS, SPENDING_ROW_MAPPER);
     }
 
