@@ -237,6 +237,26 @@ public class MBankStatementDiffService {
         }
     }
 
+    /** Counts of statement operations waiting for a decision: unreconciled, candidates and their sum (total). */
+    public Map<String, Integer> pendingCounts() {
+        Map<String, Integer> counts = new LinkedHashMap<>();
+        counts.put("unreconciled", 0);
+        counts.put("candidates", 0);
+        jdbcTemplate.query(
+                """
+                SELECT reconciliation_status, COUNT(*) AS cnt
+                FROM mbank_statement_operations
+                WHERE reconciliation_status IN ('UNRECONCILED', 'CANDIDATE_DATE_SHIFT')
+                GROUP BY reconciliation_status
+                """,
+                rs -> {
+                    String key = "UNRECONCILED".equals(rs.getString("reconciliation_status")) ? "unreconciled" : "candidates";
+                    counts.put(key, rs.getInt("cnt"));
+                });
+        counts.put("total", counts.get("unreconciled") + counts.get("candidates"));
+        return counts;
+    }
+
     @Transactional
     public ReconciliationReport reconcileRange(LocalDate from, LocalDate to) {
         LocalDate[] range = resolveDateRange(from, to);

@@ -44,6 +44,12 @@ public class MBankStatementController {
         return ResponseEntity.ok(diffService.importAndReconcileHtml(html));
     }
 
+    /** Number of statement operations waiting for a decision (missing + candidates) - badge in the app header. */
+    @GetMapping("/pending-count")
+    public Map<String, Integer> pendingCount() {
+        return diffService.pendingCounts();
+    }
+
     @GetMapping("/reconciliation")
     public ResponseEntity<ReconciliationReport> getReconciliation(
             @RequestParam(value = "from", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
