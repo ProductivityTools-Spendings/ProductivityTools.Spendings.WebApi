@@ -6,19 +6,46 @@ on:
   workflow_dispatch: # Allow manual trigger
 
 jobs:
+  get-runners:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-runners.outputs.matrix }}
+      has_runners: ${{ steps.set-runners.outputs.has_runners }}
+    steps:
+      - name: Pobierz aktywne runnery
+        id: set-runners
+        env:
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+        run: |
+          MATRIX=$(gh api /repos/${{ github.repository }}/actions/runners | jq -c '{
+            include: [
+              .runners[]
+              | select(.status == "online")
+              | (any(.labels[]; .name == "pwtag")) as $is_local
+              | {
+                  "target-runner": .name,
+                  "server-port": "8086",
+                  "db-url": (if $is_local then "jdbc:postgresql://localhost:5432/ptspendings" else "jdbc:postgresql://10.0.0.3:5432/ptspendings" end),
+                  "db-user": "postgres",
+                  "local-db": $is_local
+                }
+            ]
+          }')
+          echo "Matrix: $MATRIX"
+          echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
+          COUNT=$(echo "$MATRIX" | jq '.include | length')
+          if [ "$COUNT" -gt 0 ]; then
+            echo "has_runners=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_runners=false" >> $GITHUB_OUTPUT
+          fi
+
   build-and-deploy:
+    needs: get-runners
+    if: needs.get-runners.outputs.has_runners == 'true'
     strategy:
       fail-fast: false # Pozwala jednemu runnerowi dokończyć wdrożenie nawet jeśli drugi napotka błąd
-      matrix:
-        include:
-          - target-runner: "spendings-webapi"
-            server-port: "8086"
-            db-url: "jdbc:postgresql://10.0.0.3:5432/ptspendings"
-            db-user: "postgres"
-          - target-runner: "T460Ubuntu1"
-            server-port: "8086"
-            db-url: "jdbc:postgresql://localhost:5432/ptspendings"
-            db-user: "postgres"
+      matrix: ${{ fromJson(needs.get-runners.outputs.matrix) }}
 
     runs-on: [ self-hosted, "${{ matrix.target-runner }}" ]
 
@@ -41,7 +68,7 @@ jobs:
         cache: 'gradle'
 
     - name: Ensure PostgreSQL database exists (local PostgreSQL)
-      if: matrix.target-runner == 'T460Ubuntu1'
+      if: matrix.local-db == true
       run: |
         echo "Ensuring database 'ptspendings' exists on local PostgreSQL..."
         sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname = 'ptspendings'" | grep -q 1 || sudo -u postgres createdb ptspendings
